@@ -246,6 +246,8 @@ Widget buildCard(String title) {
           leading: const Icon(Icons.airline_seat_flat_angled),
           title: Text(title),
         ),
+        // TODO(jackson): Remove when deprecation is on stable branch
+        // ignore: deprecated_member_use
         ButtonTheme.bar(
           child: ButtonBar(
             children: <Widget>[
@@ -386,11 +388,11 @@ void main() {
                     Container(
                       padding: const EdgeInsets.only(top: 20.0),
                     ),
-                    const Text('With remote m3u8'),
+                    const Text('With remote mp4'),
                     Container(
                       padding: const EdgeInsets.all(20),
                       child: NetworkPlayerLifeCycle(
-                        'http://184.72.239.149/vod/smil:BigBuckBunny.smil/playlist.m3u8',
+                        'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
                         (BuildContext context,
                                 VideoPlayerController controller) =>
                             AspectRatioVideo(controller),

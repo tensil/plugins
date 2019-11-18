@@ -32,6 +32,8 @@ class DurationRange {
   String toString() => '$runtimeType(start: $start, end: $end)';
 }
 
+enum VideoFormat { dash, hls, ss, other }
+
 /// The duration, current position, buffering state, error state and settings
 /// of a [VideoPlayerController].
 class VideoPlayerValue {
@@ -149,6 +151,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   VideoPlayerController.asset(this.dataSource, {this.package})
       : dataSourceType = DataSourceType.asset,
         headers = null,
+        formatHint = null,
         super(VideoPlayerValue(duration: null));
 
   /// Constructs a [VideoPlayerController] playing a video from obtained from
@@ -156,7 +159,7 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
   ///
   /// The URI for the video is given by the [dataSource] argument and must not be
   /// null.
-  VideoPlayerController.network(this.dataSource, {this.headers})
+  VideoPlayerController.network(this.dataSource, {this.headers, this.formatHint})
       : dataSourceType = DataSourceType.network,
         package = null,
         super(VideoPlayerValue(duration: null));
@@ -170,11 +173,13 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         dataSourceType = DataSourceType.file,
         package = null,
         headers = null,
+        formatHint = null,
         super(VideoPlayerValue(duration: null));
 
   int _textureId;
   final String dataSource;
   final Map<String, String> headers;
+  final VideoFormat formatHint;
 
   /// Describes the type of data source this [VideoPlayerController]
   /// is constructed with.
@@ -203,10 +208,15 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
         };
         break;
       case DataSourceType.network:
-        dataSourceDescription = <String, dynamic>{'uri': dataSource, 'headers': headers};
+        dataSourceDescription = <String, dynamic>{
+          'uri': dataSource,
+          'headers': headers,
+          'formatHint': _videoFormatStringMap[formatHint]
+        };
         break;
       case DataSourceType.file:
         dataSourceDescription = <String, dynamic>{'uri': dataSource};
+        break;
     }
     final Map<String, dynamic> response =
         await _channel.invokeMapMethod<String, dynamic>(
@@ -226,6 +236,10 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     }
 
     void eventListener(dynamic event) {
+      if (_isDisposed) {
+        return;
+      }
+
       final Map<dynamic, dynamic> map = event;
       switch (map['event']) {
         case 'initialized':
@@ -396,6 +410,14 @@ class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
     value = value.copyWith(volume: volume.clamp(0.0, 1.0));
     await _applyVolume();
   }
+
+  static const Map<VideoFormat, String> _videoFormatStringMap =
+      <VideoFormat, String>{
+    VideoFormat.ss: 'ss',
+    VideoFormat.hls: 'hls',
+    VideoFormat.dash: 'dash',
+    VideoFormat.other: 'other',
+  };
 }
 
 class _VideoAppLifeCycleObserver extends Object with WidgetsBindingObserver {
