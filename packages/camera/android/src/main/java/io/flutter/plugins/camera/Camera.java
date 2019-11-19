@@ -112,7 +112,15 @@ public class Camera {
     ResolutionPreset preset = ResolutionPreset.valueOf(resolutionPreset);
     recordingProfile =
         CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset);
-    captureSize = new Size(recordingProfile.videoFrameWidth, recordingProfile.videoFrameHeight);
+    Size[] imageSizes = streamConfigurationMap.getOutputSizes(ImageFormat.JPEG);
+    Size largestImageSize = imageSizes[0];
+    for (Size size : imageSizes) {
+      // use the largest available size for image capture
+      if (size.getWidth() > largestImageSize.getWidth()) {
+        largestImageSize = size;
+      }
+    }
+    captureSize = largestImageSize;
     previewSize = computeBestPreviewSize(cameraName, preset);
   }
 
@@ -278,13 +286,13 @@ public class Camera {
     }
   }
 
-  private void createCaptureSession(int templateType, Surface... surfaces)
+  private void createCaptureSession(int templateType, Surface nonCaptureSurface, Surface captureSurface)
       throws CameraAccessException {
-    createCaptureSession(templateType, null, surfaces);
+    createCaptureSession(templateType, null, nonCaptureSurface, captureSurface);
   }
 
   private void createCaptureSession(
-      int templateType, Runnable onSuccessCallback, Surface... surfaces)
+      int templateType, Runnable onSuccessCallback, Surface nonCaptureSurface, Surface captureSurface)
       throws CameraAccessException {
     // Close any existing capture session.
     closeCaptureSession();
@@ -298,12 +306,13 @@ public class Camera {
     Surface flutterSurface = new Surface(surfaceTexture);
     captureRequestBuilder.addTarget(flutterSurface);
 
-    List<Surface> remainingSurfaces = Arrays.asList(surfaces);
-    if (templateType != CameraDevice.TEMPLATE_PREVIEW) {
-      // If it is not preview mode, add all surfaces as targets.
-      for (Surface surface : remainingSurfaces) {
-        captureRequestBuilder.addTarget(surface);
-      }
+    List<Surface> remainingSurfaces = new ArrayList<>();
+    if (captureSurface != null) {
+      remainingSurfaces.add(captureSurface);
+      captureRequestBuilder.addTarget(captureSurface);
+    }
+    if (nonCaptureSurface != null) {
+      remainingSurfaces.add(nonCaptureSurface);
     }
 
     // Prepare the callback
@@ -353,7 +362,7 @@ public class Camera {
       prepareMediaRecorder(filePath);
       recordingVideo = true;
       createCaptureSession(
-          CameraDevice.TEMPLATE_RECORD, () -> mediaRecorder.start(), mediaRecorder.getSurface());
+          CameraDevice.TEMPLATE_VIDEO_SNAPSHOT, () -> mediaRecorder.start(), pictureImageReader.getSurface(), mediaRecorder.getSurface());
       result.success(null);
     } catch (CameraAccessException | IOException e) {
       result.error("videoRecordingFailed", e.getMessage(), null);
@@ -421,12 +430,12 @@ public class Camera {
   }
 
   public void startPreview() throws CameraAccessException {
-    createCaptureSession(CameraDevice.TEMPLATE_PREVIEW, pictureImageReader.getSurface());
+    createCaptureSession(CameraDevice.TEMPLATE_PREVIEW, pictureImageReader.getSurface(), null);
   }
 
   public void startPreviewWithImageStream(EventChannel imageStreamChannel)
       throws CameraAccessException {
-    createCaptureSession(CameraDevice.TEMPLATE_RECORD, imageStreamReader.getSurface());
+    createCaptureSession(CameraDevice.TEMPLATE_VIDEO_SNAPSHOT, pictureImageReader.getSurface(), imageStreamReader.getSurface());
 
     imageStreamChannel.setStreamHandler(
         new EventChannel.StreamHandler() {
