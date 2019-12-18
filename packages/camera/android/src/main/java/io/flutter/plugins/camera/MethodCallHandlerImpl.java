@@ -145,6 +145,9 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
     String cameraName = call.argument("cameraName");
     String resolutionPreset = call.argument("resolutionPreset");
     boolean enableAudio = call.argument("enableAudio");
+    boolean overrideFormatMpegTs = call.argument("overrideFormatMpegTs");
+    String startVideoRecordingPath = call.argument("startVideoRecordingPath");
+    double videoBitrateFactor = call.argument("videoBitrateFactor");
     TextureRegistry.SurfaceTextureEntry flutterSurfaceTexture =
         textureRegistry.createSurfaceTexture();
     DartMessenger dartMessenger = new DartMessenger(messenger, flutterSurfaceTexture.id());
@@ -155,9 +158,11 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             dartMessenger,
             cameraName,
             resolutionPreset,
-            enableAudio);
+            enableAudio,
+            overrideFormatMpegTs,
+            videoBitrateFactor);
 
-    camera.open(result);
+    camera.open(startVideoRecordingPath, result);
   }
 
   // We move catching CameraAccessException out of onMethodCall because it causes a crash

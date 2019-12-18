@@ -49,6 +49,8 @@ public class Camera {
   private final Size captureSize;
   private final Size previewSize;
   private final boolean enableAudio;
+  private final boolean overrideFormatMpegTs;
+  private final double videoBitrateFactor;
 
   private CameraDevice cameraDevice;
   private CameraCaptureSession cameraCaptureSession;
@@ -77,7 +79,9 @@ public class Camera {
       final DartMessenger dartMessenger,
       final String cameraName,
       final String resolutionPreset,
-      final boolean enableAudio)
+      final boolean enableAudio,
+      final boolean overrideFormatMpegTs,
+      final double videoBitrateFactor)
       throws CameraAccessException {
     if (activity == null) {
       throw new IllegalStateException("No activity available!");
@@ -85,6 +89,8 @@ public class Camera {
 
     this.cameraName = cameraName;
     this.enableAudio = enableAudio;
+    this.overrideFormatMpegTs = overrideFormatMpegTs;
+    this.videoBitrateFactor = videoBitrateFactor;
     this.flutterTexture = flutterTexture;
     this.dartMessenger = dartMessenger;
     this.cameraManager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
@@ -134,11 +140,19 @@ public class Camera {
     // of these function calls.
     if (enableAudio) mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
     mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
-    mediaRecorder.setOutputFormat(recordingProfile.fileFormat);
+    if (overrideFormatMpegTs) {
+      mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_2_TS);
+    } else {
+      mediaRecorder.setOutputFormat(recordingProfile.fileFormat);
+    }
     if (enableAudio) mediaRecorder.setAudioEncoder(recordingProfile.audioCodec);
     mediaRecorder.setVideoEncoder(recordingProfile.videoCodec);
-    mediaRecorder.setVideoEncodingBitRate(recordingProfile.videoBitRate);
-    if (enableAudio) mediaRecorder.setAudioSamplingRate(recordingProfile.audioSampleRate);
+    mediaRecorder.setVideoEncodingBitRate((int) Math.round(recordingProfile.videoBitRate * videoBitrateFactor));
+    if (enableAudio) {
+        mediaRecorder.setAudioSamplingRate(recordingProfile.audioSampleRate);
+        mediaRecorder.setAudioChannels(recordingProfile.audioChannels);
+        mediaRecorder.setAudioEncodingBitRate(recordingProfile.audioBitRate);
+    }
     mediaRecorder.setVideoFrameRate(recordingProfile.videoFrameRate);
     mediaRecorder.setVideoSize(recordingProfile.videoFrameWidth, recordingProfile.videoFrameHeight);
     mediaRecorder.setOutputFile(outputFilePath);
@@ -148,7 +162,7 @@ public class Camera {
   }
 
   @SuppressLint("MissingPermission")
-  public void open(@NonNull final Result result) throws CameraAccessException {
+  public void open(final String startVideoRecordingPath, @NonNull final Result result) throws CameraAccessException {
     pictureImageReader =
         ImageReader.newInstance(
             captureSize.getWidth(), captureSize.getHeight(), ImageFormat.JPEG, 2);
@@ -165,7 +179,24 @@ public class Camera {
           public void onOpened(@NonNull CameraDevice device) {
             cameraDevice = device;
             try {
-              startPreview();
+              if (startVideoRecordingPath == null) {
+                startPreview();
+              } else {
+                if (new File(startVideoRecordingPath).exists()) {
+                  result.error("fileExists", "File at path '" + startVideoRecordingPath + "' already exists.", null);
+                  return;
+                }
+                try {
+                  prepareMediaRecorder(startVideoRecordingPath);
+                  recordingVideo = true;
+                  createCaptureSession(
+                          CameraDevice.TEMPLATE_VIDEO_SNAPSHOT, () -> mediaRecorder.start(), pictureImageReader.getSurface(), mediaRecorder.getSurface());
+                } catch (CameraAccessException | IOException e) {
+                  result.error("videoRecordingFailed", e.getMessage(), null);
+                  close();
+                  return;
+                }
+              }
             } catch (CameraAccessException e) {
               result.error("CameraAccess", e.getMessage(), null);
               close();

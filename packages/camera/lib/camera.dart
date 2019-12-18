@@ -245,6 +245,8 @@ class CameraController extends ValueNotifier<CameraValue> {
     this.description,
     this.resolutionPreset, {
     this.enableAudio = true,
+    this.overrideFormatMpegTs = false,
+    this.overrideDefaultVideoBitrateFactor
   }) : super(const CameraValue.uninitialized());
 
   final CameraDescription description;
@@ -252,6 +254,8 @@ class CameraController extends ValueNotifier<CameraValue> {
 
   /// Whether to include audio when recording a video.
   final bool enableAudio;
+  final bool overrideFormatMpegTs;
+  final double overrideDefaultVideoBitrateFactor;
 
   int _textureId;
   bool _isDisposed = false;
@@ -262,7 +266,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   /// Initializes the camera on the device.
   ///
   /// Throws a [CameraException] if the initialization fails.
-  Future<void> initialize() async {
+  Future<void> initialize([String startVideoRecordingPath]) async {
     if (_isDisposed) {
       return Future<void>.value();
     }
@@ -275,16 +279,31 @@ class CameraController extends ValueNotifier<CameraValue> {
           'cameraName': description.name,
           'resolutionPreset': serializeResolutionPreset(resolutionPreset),
           'enableAudio': enableAudio,
+          'overrideFormatMpegTs': overrideFormatMpegTs,
+          'videoBitrateFactor': overrideDefaultVideoBitrateFactor ?? 1.0,
+          'startVideoRecordingPath': startVideoRecordingPath,
         },
       );
       _textureId = reply['textureId'];
-      value = value.copyWith(
-        isInitialized: true,
-        previewSize: Size(
-          reply['previewWidth'].toDouble(),
-          reply['previewHeight'].toDouble(),
-        ),
-      );
+      if (startVideoRecordingPath == null) {
+        value = value.copyWith(
+          isInitialized: true,
+          previewSize: Size(
+            reply['previewWidth'].toDouble(),
+            reply['previewHeight'].toDouble(),
+          ),
+        );
+      } else {
+        value = value.copyWith(
+          isInitialized: true,
+          isRecordingVideo: true,
+          isRecordingPaused: false,
+          previewSize: Size(
+            reply['previewWidth'].toDouble(),
+            reply['previewHeight'].toDouble(),
+          ),
+        );
+      }
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
