@@ -120,6 +120,7 @@ public class VideoPlayerPlugin implements MethodCallHandler, FlutterPlugin {
                     handle,
                     "asset:///" + assetLookupKey,
                     result,
+                    null,
                     null);
             videoPlayers.put(handle.id(), player);
           } else {
@@ -130,6 +131,7 @@ public class VideoPlayerPlugin implements MethodCallHandler, FlutterPlugin {
                     handle,
                     call.argument("uri"),
                     result,
+                    call.argument("headers"),
                     call.argument("formatHint"));
             videoPlayers.put(handle.id(), player);
           }

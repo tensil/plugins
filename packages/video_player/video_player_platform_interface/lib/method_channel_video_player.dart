@@ -41,6 +41,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
       case DataSourceType.network:
         dataSourceDescription = <String, dynamic>{
           'uri': dataSource.uri,
+          'headers': dataSource.headers,
           'formatHint': _videoFormatStringMap[dataSource.formatHint]
         };
         break;
